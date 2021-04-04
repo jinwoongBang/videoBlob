@@ -7,10 +7,138 @@
     <title>Document</title>
   </head>
   <body>
-    <!-- <video src="./video/test.mp4" preload="auto" crossorigin="anonymous" /> -->
-    <video width="320" height="240" controls>
-      <source src="http://localhost:9090/video/test.mp4" type="video/mp4" />
-      Your browser does not support the video tag.
-    </video>
+    <video id="video" width="320" height="240"></video>
+
+    <div>
+      <h1 id="message"></h1>
+    </div>
+
+    <!-- <script>
+      window.onload = function () {
+        var url = "http://localhost:9090/video/test.mp4";
+        var video = document.getElementById("video");
+
+        // 새로운 MediaSource 만든다.
+        var mediaSource = new MediaSource(url);
+
+        // MediaSource가 Video에 연결되어 스트리밍 데이터를 받을 준비가 되면 sourceopen 이벤트가 발생한다.
+        mediaSource.addEventListener("sourceopen", onSourceOpen);
+
+        video.src = window.URL.createObjectURL(mediaSource);
+
+        function onSourceOpen(event) {
+          console.log("source open");
+          console.log(event);
+
+          var _mediaSource = event.target;
+
+          var sourceBuffer = _mediaSource.addSourceBuffer(
+            // 'video/webm; codecs="vorbis,vp8"'
+            'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
+          );
+
+          fetch(url, function (response) {
+            
+          });
+
+          console.log({ sourceBuffer, _mediaSource });
+        }
+
+        function fetch(url, cb) {
+          var xhr = new XMLHttpRequest();
+          xhr.open("get", url);
+          xhr.responseType = "arraybuffer";
+          xhr.onload = function () {
+            console.log(xhr.response);
+            cb(xhr.response);
+          };
+          xhr.send();
+        }
+      };
+    </script> -->
+
+    <script>
+      var url = "http://localhost:9090/video/test.mp4";
+      // var videoResponse = fetch(url);
+
+      // As before, I'm regularly grabbing blobs of video data
+      // The implementation of "nextChunk" could be various things:
+      //   - reading from a MediaRecorder
+      //   - reading from an XMLHttpRequest
+      //   - reading from a local webcam
+      //   - generating the files on the fly in JavaScript
+      //   - etc
+      var arrayOfBlobs = [];
+
+      fetch(url, function (byteArray) {
+        arrayOfBlobs = byteArray;
+        console.log(byteArray);
+      });
+
+      setInterval(function () {
+        console.log(arrayOfBlobs);
+        // arrayOfBlobs.append(videoResponse[i]);
+        // i++;
+        // NEW: Try to flush our queue of video data to the video element
+        appendToSourceBuffer();
+      }, 1000);
+
+      // 1. Create a `MediaSource`
+      var mediaSource = new MediaSource();
+
+      // 2. Create an object URL from the `MediaSource`
+      var url = URL.createObjectURL(mediaSource);
+
+      // 3. Set the video's `src` to the object URL
+      var video = document.getElementById("video");
+      video.src = url;
+
+      // 4. On the `sourceopen` event, create a `SourceBuffer`
+      var sourceBuffer = null;
+      mediaSource.addEventListener("sourceopen", function () {
+        // NOTE: Browsers are VERY picky about the codec being EXACTLY
+        // right here. Make sure you know which codecs you're using!
+        sourceBuffer = mediaSource.addSourceBuffer(
+          'video/webm; codecs="opus,vp8"'
+        );
+
+        // If we requested any video data prior to setting up the SourceBuffer,
+        // we want to make sure we only append one blob at a time
+        sourceBuffer.addEventListener("updateend", appendToSourceBuffer);
+      });
+
+      // 5. Use `SourceBuffer.appendBuffer()` to add all of your chunks to the video
+      function appendToSourceBuffer() {
+        if (
+          mediaSource.readyState === "open" &&
+          sourceBuffer &&
+          sourceBuffer.updating === false
+        ) {
+          sourceBuffer.appendBuffer(arrayOfBlobs.shift());
+        }
+
+        // Limit the total buffer size to 20 minutes
+        // This way we don't run out of RAM
+        if (
+          video.buffered.length &&
+          video.buffered.end(0) - video.buffered.start(0) > 1200
+        ) {
+          sourceBuffer.remove(0, video.buffered.end(0) - 1200);
+        }
+      }
+
+      function fetch(url, cb) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("get", url);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function () {
+          var response = xhr.response;
+          console.log(response);
+          var byteArray = new Uint8Array(response);
+          cb(byteArray);
+        };
+        xhr.send();
+      }
+    </script>
   </body>
 </html>
